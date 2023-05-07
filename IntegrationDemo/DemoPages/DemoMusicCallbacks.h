@@ -63,9 +63,13 @@ public:
 	DemoMusicCallbacks( Menu& in_ParentMenu );
 
 	virtual bool Init();
+	void StopAndGoToAnother(bool bForce);
 
 	/// Override of the Page::Draw() method.
 	virtual void Draw();
+	void WriteLog(const char* message);
+	void ExtractNames();
+	void LaunchNextEvent(int NextEventPos);
 
 	/// Callback method for the events raised by Wwise while playing the markers demo audio.
 	static void MusicCallback( 
@@ -76,6 +80,13 @@ public:
 private:
 	AkUInt32 m_uiBeatCount;
 	AkUInt32 m_uiBarCount;
+	
+	std::vector<std::tuple<char*, unsigned long, char*>> SnbIdEventList = {};
+	int CurrentSIEPos = 0;
+	int CurrentRep = 1;
+	int AmountOfRep = 5;
+	time_t TimeStartedPlaying;
+	char* CurrentBank;
 };
 
 class DemoMusicPlaylistCallbacks : public DemoMusicCallbacksBase
