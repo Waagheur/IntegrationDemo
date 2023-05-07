@@ -113,7 +113,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR /*lp
 	initSettings.uDefaultPoolSize = 64;
 	initSettings.uMonitorPoolSize = 524288;
 	initSettings.uMonitorQueuePoolSize = 524288;
-	initSettings.uPrepareEventMemoryPoolID = AK::MemoryMgr::CreatePool(NULL, 200 * 1024 * 1024, 1024, AkMalloc);
+	initSettings.uPrepareEventMemoryPoolID = AK::MemoryMgr::CreatePool(NULL, 500 * 1024 * 1024, 1024, AkMalloc);
 	initSettings.bEnableGameSyncPreparation = false;
 	
 	platformInitSettings.hWnd = hWnd;
