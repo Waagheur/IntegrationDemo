@@ -21,6 +21,9 @@ public:
 	/// \return True if successful and False otherwise.
 	virtual bool Init();
 
+	void Callback(AkCallbackType in_eType,			///< - The type of the callback
+		AkCallbackInfo* in_pCallbackInfo);
+	
 	/// Releases resources used by the demo.
 	virtual void Release();
 

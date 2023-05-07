@@ -3,7 +3,13 @@
 /// \file 
 /// Defines the methods declared in DemoMarkers.h.
 
+
 #include "stdafx.h"
+#include <fstream>
+#include <ostream>
+#include <string>
+#include <tuple>
+#include <time.h>
 
 #include <AK/SoundEngine/Common/AkSoundEngine.h>    // Sound engine
 
@@ -11,345 +17,540 @@
 #include "Menu.h"
 #include "DemoMusicCallbacks.h"
 
+#include <fstream>
+
+#include "SBData.h"
 
 static const int kNotesPerOctave = 12;
-static const char* kNoteArray[kNotesPerOctave] = 
-	{ "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+static const char* kNoteArray[kNotesPerOctave] =
+    {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
 // Helper to convert note number to note text
-void MidiNoteToString( int in_iNoteNum, char* out_szNote, unsigned int in_uiBufferSize )
+void MidiNoteToString(int in_iNoteNum, char* out_szNote, unsigned int in_uiBufferSize)
 {
-	int octave = (in_iNoteNum/kNotesPerOctave);
-	const char* myNote = kNoteArray[ in_iNoteNum % kNotesPerOctave ];
+    int octave = (in_iNoteNum / kNotesPerOctave);
+    const char* myNote = kNoteArray[in_iNoteNum % kNotesPerOctave];
 
-	octave -= 1;
-	snprintf( out_szNote, in_uiBufferSize, "%s%i", myNote, octave);
+    octave -= 1;
+    snprintf(out_szNote, in_uiBufferSize, "%s%i", myNote, octave);
 }
 
 // *********************************************************************************
 // Root Page
 // *********************************************************************************
 
-DemoMusicCallbacksRoot::DemoMusicCallbacksRoot( Menu& in_ParentMenu )
-: Page( in_ParentMenu, "Music Callbacks Demos" )
+DemoMusicCallbacksRoot::DemoMusicCallbacksRoot(Menu& in_ParentMenu)
+    : Page(in_ParentMenu, "Music Callbacks Demos")
 {
-	m_szHelp  = "This demo shows how to use the different music callbacks.\n\n";
+    m_szHelp = "This demo shows how to use the different music callbacks.\n\n";
 }
 
 void DemoMusicCallbacksRoot::InitControls()
 {
-	ButtonControl* newBtn;
+    ButtonControl* newBtn;
 
-	newBtn = new ButtonControl( *this );
-	newBtn->SetLabel( "Music Sync Callback Demo" );
-	newBtn->SetDelegate( (PageMFP)&DemoMusicCallbacksRoot::MusicSyncCallbackButton_Pressed );
-	m_Controls.push_back( newBtn );
+    newBtn = new ButtonControl(*this);
+    newBtn->SetLabel("Music Sync Callback Demo");
+    newBtn->SetDelegate((PageMFP)&DemoMusicCallbacksRoot::MusicSyncCallbackButton_Pressed);
+    m_Controls.push_back(newBtn);
 
-	newBtn = new ButtonControl( *this );
-	newBtn->SetLabel( "Music Playlist Callback Demo" );
-	newBtn->SetDelegate( (PageMFP)&DemoMusicCallbacksRoot::MusicPlaylistCallbackButton_Pressed );
-	m_Controls.push_back( newBtn );
+    newBtn = new ButtonControl(*this);
+    newBtn->SetLabel("Music Playlist Callback Demo");
+    newBtn->SetDelegate((PageMFP)&DemoMusicCallbacksRoot::MusicPlaylistCallbackButton_Pressed);
+    m_Controls.push_back(newBtn);
 
-	newBtn = new ButtonControl( *this );
-	newBtn->SetLabel( "MIDI Callback Demo" );
-	newBtn->SetDelegate( (PageMFP)&DemoMusicCallbacksRoot::MusicMIDICallbackButton_Pressed );
-	m_Controls.push_back( newBtn );
+    newBtn = new ButtonControl(*this);
+    newBtn->SetLabel("MIDI Callback Demo");
+    newBtn->SetDelegate((PageMFP)&DemoMusicCallbacksRoot::MusicMIDICallbackButton_Pressed);
+    m_Controls.push_back(newBtn);
 }
 
-void DemoMusicCallbacksRoot::MusicSyncCallbackButton_Pressed( void* , ControlEvent* )
+void DemoMusicCallbacksRoot::MusicSyncCallbackButton_Pressed(void*, ControlEvent*)
 {
-	DemoMusicCallbacks* pg = new DemoMusicCallbacks( *m_pParentMenu );
-	m_pParentMenu->StackPage( pg );
+    DemoMusicCallbacks* pg = new DemoMusicCallbacks(*m_pParentMenu);
+    m_pParentMenu->StackPage(pg);
 }
 
-void DemoMusicCallbacksRoot::MusicPlaylistCallbackButton_Pressed( void* , ControlEvent* )
+void DemoMusicCallbacksRoot::MusicPlaylistCallbackButton_Pressed(void*, ControlEvent*)
 {
-	DemoMusicPlaylistCallbacks* pg = new DemoMusicPlaylistCallbacks( *m_pParentMenu );
-	m_pParentMenu->StackPage( pg );
+    DemoMusicPlaylistCallbacks* pg = new DemoMusicPlaylistCallbacks(*m_pParentMenu);
+    m_pParentMenu->StackPage(pg);
 }
 
-void DemoMusicCallbacksRoot::MusicMIDICallbackButton_Pressed( void* , ControlEvent* )
+void DemoMusicCallbacksRoot::MusicMIDICallbackButton_Pressed(void*, ControlEvent*)
 {
-	DemoMIDICallbacks* pg = new DemoMIDICallbacks( *m_pParentMenu );
-	m_pParentMenu->StackPage( pg );
+    DemoMIDICallbacks* pg = new DemoMIDICallbacks(*m_pParentMenu);
+    m_pParentMenu->StackPage(pg);
 }
 
 // *********************************************************************************
 // Base class
 // *********************************************************************************
 
-DemoMusicCallbacksBase::DemoMusicCallbacksBase( Menu& in_ParentMenu, const string& in_strPageTitle )
-: Page( in_ParentMenu, in_strPageTitle )
-, m_bIsPlaying( false )
-, m_bStopPlaylist( false )
-, m_iPlayingID( 0 )
+DemoMusicCallbacksBase::DemoMusicCallbacksBase(Menu& in_ParentMenu, const string& in_strPageTitle)
+    : Page(in_ParentMenu, in_strPageTitle)
+      , m_bIsPlaying(false)
+      , m_bStopPlaylist(false)
+      , m_iPlayingID(0)
 {
 }
 
 bool DemoMusicCallbacksBase::Init()
 {
-	// Load the sound bank
-	AkBankID bankID; // Not used
-	if ( AK::SoundEngine::LoadBank( "MusicCallbacks.bnk", AK_DEFAULT_POOL_ID, bankID ) != AK_Success )
-	{
-		SetLoadFileErrorMessage( "MusicCallbacks.bnk" );
-		return false;
-	}
+    // Load the sound bank
+    AkBankID bankID; // Not used
 
-	// Register the "Markers" game object
-	AK::SoundEngine::RegisterGameObj( GAME_OBJECT_MUSIC, "Music" );
+    // Register the "Markers" game object
+    AK::SoundEngine::RegisterGameObj(GAME_OBJECT_MUSIC, "Music");
 
-	// Initialize the marker playback variables
-	m_bIsPlaying = true;
-	
-	// Initialize the page
-	return Page::Init();
+    // Initialize the marker playback variables
+    m_bIsPlaying = true;
+
+    // Initialize the page
+    return Page::Init();
 }
 
 void DemoMusicCallbacksBase::Release()
 {
-	// Make sure we do not get called back after page destruction
-	AK::SoundEngine::CancelEventCallback( m_iPlayingID );
+    // Make sure we do not get called back after page destruction
+    AK::SoundEngine::CancelEventCallback(m_iPlayingID);
 
-	// Stop the sound playing
-	AK::SoundEngine::StopPlayingID( m_iPlayingID );
+    // Stop the sound playing
+    AK::SoundEngine::StopPlayingID(m_iPlayingID);
 
-	// Unregister the "Music" game object
-	AK::SoundEngine::UnregisterGameObj( GAME_OBJECT_MUSIC );
+    // Unregister the "Music" game object
+    AK::SoundEngine::UnregisterGameObj(GAME_OBJECT_MUSIC);
 
-	// Unload the sound bank
-	AK::SoundEngine::UnloadBank( "MusicCallbacks.bnk", NULL );
+    // Unload the sound bank
+    AK::SoundEngine::UnloadBank("MusicCallbacks.bnk", NULL);
 
-	// Releases the page
-	Page::Release();
+    // Releases the page
+    Page::Release();
 }
 
 void DemoMusicCallbacksBase::Draw()
 {
-	Page::Draw();
+    Page::Draw();
 
-	if ( ! m_bIsPlaying )
-	{
-		int iPosX = m_pParentMenu->GetWidth() / 4;
-		int iPosY = m_pParentMenu->GetHeight() / 3;
-		DrawTextOnScreen( "Test Finished", iPosX, iPosY, DrawStyle_Text );	
-	}
+    if (! m_bIsPlaying)
+    {
+        int iPosX = m_pParentMenu->GetWidth() / 4;
+        int iPosY = m_pParentMenu->GetHeight() / 3;
+        DrawTextOnScreen("Test Finished", iPosX, iPosY, DrawStyle_Text);
+    }
 }
 
 // *********************************************************************************
 // Music Callbacks
 // *********************************************************************************
 
-DemoMusicCallbacks::DemoMusicCallbacks( Menu& in_ParentMenu )
-: DemoMusicCallbacksBase( in_ParentMenu, "Music Sync Callback Demo" )
-, m_uiBeatCount( 0 )
-, m_uiBarCount( 0 )
+DemoMusicCallbacks::DemoMusicCallbacks(Menu& in_ParentMenu)
+    : DemoMusicCallbacksBase(in_ParentMenu, "Music Sync Callback Demo")
+      , m_uiBeatCount(0)
+      , m_uiBarCount(0)
 {
-	m_szHelp  = "Beat and Bar notifications are generated from "
-				"playing music's tempo and time signature info.";
+    m_szHelp = "Beat and Bar notifications are generated from "
+        "playing music's tempo and time signature info.";
+    CurrentBank = "";
+    TimeStartedPlaying = 0;
 }
 
 
 void DemoMusicCallbacks::Draw()
 {
-	DemoMusicCallbacksBase::Draw();
+    DemoMusicCallbacksBase::Draw();
 
-	if ( m_bIsPlaying )
-	{
-		char strBuf[50];
-		int iPosX = m_pParentMenu->GetWidth() / 4;
-		int iPosY = m_pParentMenu->GetHeight() / 3;
+    time_t seconds = time(NULL);
 
-		AkTimeMs uPosition;
+    if (seconds - TimeStartedPlaying > 10 && TimeStartedPlaying != 0)
+    {
+        StopAndGoToAnother(true);
+    }
 
-		// Get the current play position and store it in a string buffer
-		AK::SoundEngine::GetSourcePlayPosition( m_iPlayingID, &uPosition );
-		snprintf( strBuf, 50, "Bar: %d\nBeat: %d\nPosition=%d", (int)m_uiBarCount, (int)m_uiBeatCount, (int)uPosition );
+    if (m_bIsPlaying)
+    {
+        char strBuf[50];
+        int iPosX = m_pParentMenu->GetWidth() / 4;
+        int iPosY = m_pParentMenu->GetHeight() / 3;
 
-		// Draw the play position and subtitles
-		DrawTextOnScreen( strBuf, iPosX, iPosY, DrawStyle_Text );
-	}
+        AkTimeMs uPosition;
+
+        // Get the current play position and store it in a string buffer
+        AK::SoundEngine::GetSourcePlayPosition(m_iPlayingID, &uPosition);
+        snprintf(strBuf, 50, "Bar: %d\nBeat: %d\nPosition=%d", (int)m_uiBarCount, (int)m_uiBeatCount, (int)uPosition);
+
+        // Draw the play position and subtitles
+        DrawTextOnScreen(strBuf, iPosX, iPosY, DrawStyle_Text);
+    }
+}
+
+void DemoMusicCallbacks::WriteLog(const char* message)
+{
+    std::ofstream outfile;
+    outfile.open("log.txt", std::ios_base::app); // append instead of overwrite
+    outfile << message << "\r\n";
+}
+
+void DemoMusicCallbacks::ExtractNames()
+{
+    char* event_names[] = {"adad"};
+
+    string result = "";
+    for (char* event_name : event_names)
+    {
+        unsigned long id = AK::SoundEngine::GetIDFromString(event_name);
+        string event_id = std::to_string(id);
+
+        result += static_cast<string>(event_name) + " " + event_id + "\n";
+    }
+    std::ofstream myfile;
+    myfile.open("all_events.txt");
+    myfile << result;
+    myfile.close();
+}
+
+bool replace(std::string& str, const std::string& from, const std::string& to)
+{
+    size_t start_pos = str.find(from);
+    if (start_pos == std::string::npos)
+        return false;
+    str.replace(start_pos, from.length(), to);
+    return true;
+}
+
+inline bool file_exists(const std::string& name)
+{
+    struct stat buffer;
+    return (stat(name.c_str(), &buffer) == 0);
+}
+
+void DemoMusicCallbacks::LaunchNextEvent(int NextEventPos)
+{
+    auto t = SnbIdEventList[NextEventPos];
+    char* snb_name = std::get<0>(t);
+    unsigned long id = std::get<1>(t);
+    char* event_name = std::get<2>(t);
+
+    if (std::strlen(CurrentBank) != 0 && CurrentBank != snb_name)
+    {
+        SetErrorMessage("Another bank, need reload");
+        return;
+    }
+
+    TimeStartedPlaying = time(NULL);
+
+    auto snb_name_string = static_cast<string>(snb_name);
+    replace(snb_name_string, ".", "_");
+
+    string log_line = snb_name_string + " " + std::to_string(id) + " " + static_cast<string>(event_name) + "_" +
+        std::to_string(CurrentRep) + ".wav";
+
+    string filename = snb_name_string + "_" + static_cast<string>(event_name) + "_" +
+        std::to_string(CurrentRep) + ".wav";
+    auto c_str = filename.c_str();
+
+    AkOSChar* new_name;
+    CONVERT_CHAR_TO_OSCHAR(c_str, new_name);
+
+    if (file_exists("../WwiseProject/GeneratedSoundBanks/Windows/" + filename))
+    {
+        string ll1 = filename + "already exists, skipping";
+        // WriteLog(ll1.c_str());
+        StopAndGoToAnother(true);
+        return;
+    }
+
+    WriteLog(log_line.c_str());
+
+    AkBankID bankID; // Not used
+    // AK::SoundEngine::ClearBanks();
+
+    AKRESULT load_bank = AK::SoundEngine::LoadBank(snb_name, AK_DEFAULT_POOL_ID, bankID);
+    // AKRESULT load_bank = AK::SoundEngine::LoadBank(snb_name, AK_DEFAULT_POOL_ID, bankID);
+
+    CurrentBank = snb_name;
+
+    char buffer[100];
+    std::sprintf(buffer, "Loading bank %s success: %d", snb_name, load_bank);
+    WriteLog(buffer);
+
+    // AkUniqueID eventToPrepare[] = {
+    //     id
+    // };
+    // AKRESULT Res = AK::SoundEngine::PrepareEvent(AK::SoundEngine::Preparation_Load, eventToPrepare, 1);
+
+    switch (load_bank)
+    {
+    case AK_Success:
+        break;
+    case AK_BankAlreadyLoaded:
+        break;
+    default:
+        WriteLog("Couldn't load bank, skipping");
+        StopAndGoToAnother(true);
+        return;
+    }
+
+    // switch (Res)
+    // {
+    // case AK_Success:
+    //     break;
+    // case AK_InsufficientMemory:
+    //     WriteLog("Memory limit reached");
+    //     return;
+    //     break;
+    // default:
+    //     WriteLog("Not success for event, launching another");
+    //     StopAndGoToAnother(true);
+    //     return;
+    // }
+
+    AK::SoundEngine::StartOutputCapture(new_name);
+
+    // char buffer2[150];
+    // std::sprintf(buffer2, "Preparing event %s success: %d", event_name, Res);
+    // WriteLog(buffer2);
+
+    m_iPlayingID = AK::SoundEngine::PostEvent(
+        id,
+        GAME_OBJECT_MUSIC,
+        AK_EnableGetSourcePlayPosition | AK_MusicSyncBeat | AK_MusicSyncBar | AK_MusicSyncEntry |
+        AK_MusicSyncExit |
+        AK_EndOfEvent,
+        &DemoMusicCallbacks::MusicCallback,
+        this
+    );
 }
 
 bool DemoMusicCallbacks::Init()
 {
-	DemoMusicCallbacksBase::Init();
+    DemoMusicCallbacksBase::Init();
 
-	m_iPlayingID = AK::SoundEngine::PostEvent( 
-		AK::EVENTS::PLAYMUSICDEMO1,
-		GAME_OBJECT_MUSIC,
-		AK_EnableGetSourcePlayPosition | AK_MusicSyncBeat | AK_MusicSyncBar | AK_MusicSyncEntry | AK_MusicSyncExit | AK_EndOfEvent,
-		&DemoMusicCallbacks::MusicCallback,
-		this
-		);
+    // JKC 1: Button pressed, start recording and playing events.
 
-	return true;
+    WriteLog("Starting iterations");
+
+    CurrentSIEPos = 0;
+    SnbIdEventList = {};
+    SnbIdEventList = SNBData;
+    
+    for (int i = 0; i < SNBData.size(); i++)
+    {
+        auto t = SnbIdEventList[i];
+        char* snb_name = std::get<0>(t);
+        unsigned long id = std::get<1>(t);
+        char* event_name = std::get<2>(t);
+
+        string filename = static_cast<string>(snb_name) + "_" + static_cast<string>(event_name) + "_" +
+            "1" + ".wav";
+        
+        replace(filename, ".", "_");
+        
+        if (!file_exists("../WwiseProject/GeneratedSoundBanks/Windows/" + filename))
+        {
+            break;
+        } else
+        {
+            CurrentSIEPos = i;
+        }
+    }
+    
+    LaunchNextEvent(CurrentSIEPos);
+
+    return true;
 }
 
-void DemoMusicCallbacks::MusicCallback( AkCallbackType in_eType, AkCallbackInfo* in_pCallbackInfo )
+void DemoMusicCallbacks::StopAndGoToAnother(bool bForce)
 {
-	DemoMusicCallbacks* pPage = (DemoMusicCallbacks*)in_pCallbackInfo->pCookie;
-	
-	if ( in_eType == AK_MusicSyncBar )
-	{
-		pPage->m_uiBeatCount = 0;
-		pPage->m_uiBarCount++;
-	}
-	else if ( in_eType == AK_MusicSyncBeat )
-	{
-		pPage->m_uiBeatCount++;
-	}
-	else if ( in_eType == AK_EndOfEvent )
-	{
-		pPage->m_bIsPlaying = false;
-		pPage->m_uiBeatCount = 0;
-		pPage->m_uiBarCount = 0;
-	}
+    // JKC: Event ended, stop capture
+    AK::SoundEngine::StopOutputCapture();
+    AK::SoundEngine::StopAll();
+    AK::SoundEngine::CancelEventCallback(m_iPlayingID);
+
+    // Make repeats if short sound, if long then don't
+    if (CurrentRep < AmountOfRep && !bForce)
+    {
+        CurrentRep++;
+    }
+    else
+    {
+        CurrentRep = 1;
+        CurrentSIEPos = CurrentSIEPos + 1;
+    }
+
+    if (CurrentSIEPos <= SnbIdEventList.size() - 1)
+    {
+        LaunchNextEvent(CurrentSIEPos);
+    }
+}
+
+void DemoMusicCallbacks::MusicCallback(AkCallbackType in_eType, AkCallbackInfo* in_pCallbackInfo)
+{
+    DemoMusicCallbacks* pPage = (DemoMusicCallbacks*)in_pCallbackInfo->pCookie;
+
+    time_t seconds = time(NULL);
+
+    if (in_eType == AK_MusicSyncBar)
+    {
+        pPage->m_uiBeatCount = 0;
+        pPage->m_uiBarCount++;
+    }
+    else if (in_eType == AK_MusicSyncBeat)
+    {
+        pPage->m_uiBeatCount++;
+    }
+    else if (in_eType == AK_EndOfEvent || in_eType == AK_MusicSyncExit || seconds - pPage->TimeStartedPlaying >= 10)
+    {
+        pPage->m_bIsPlaying = false;
+        pPage->m_uiBeatCount = 0;
+        pPage->m_uiBarCount = 0;
+        pPage->StopAndGoToAnother(false);
+    }
 }
 
 // *********************************************************************************
 // Playlist Callbacks
 // *********************************************************************************
 
-DemoMusicPlaylistCallbacks::DemoMusicPlaylistCallbacks( Menu& in_ParentMenu )
-: DemoMusicCallbacksBase( in_ParentMenu, "Music Playlist Callback Demo" )
-, m_uiPlaylistItem( 0 )
+DemoMusicPlaylistCallbacks::DemoMusicPlaylistCallbacks(Menu& in_ParentMenu)
+    : DemoMusicCallbacksBase(in_ParentMenu, "Music Playlist Callback Demo")
+      , m_uiPlaylistItem(0)
 {
-	m_szHelp  = "This example to force a random playlist to select its next item sequentially. "
-				"The playlist item may be stopped via the callback as well.";
+    m_szHelp = "This example to force a random playlist to select its next item sequentially. "
+        "The playlist item may be stopped via the callback as well.";
 }
 
 
 void DemoMusicPlaylistCallbacks::Draw()
 {
-	DemoMusicCallbacksBase::Draw();
+    DemoMusicCallbacksBase::Draw();
 
-	if ( m_bIsPlaying )
-	{
-		char strBuf[50];
-		int iPosX = m_pParentMenu->GetWidth() / 4;
-		int iPosY = m_pParentMenu->GetHeight() / 3;
+    if (m_bIsPlaying)
+    {
+        char strBuf[50];
+        int iPosX = m_pParentMenu->GetWidth() / 4;
+        int iPosY = m_pParentMenu->GetHeight() / 3;
 
-		snprintf( strBuf, 50, "Random playlist forced to sequential\nNext Index:%d", (int)m_uiPlaylistItem );
+        snprintf(strBuf, 50, "Random playlist forced to sequential\nNext Index:%d", (int)m_uiPlaylistItem);
 
-		// Draw the play position and subtitles
-		DrawTextOnScreen( strBuf, iPosX, iPosY, DrawStyle_Text );
-	}
+        // Draw the play position and subtitles
+        DrawTextOnScreen(strBuf, iPosX, iPosY, DrawStyle_Text);
+    }
 }
 
 bool DemoMusicPlaylistCallbacks::Init()
 {
-	DemoMusicCallbacksBase::Init();
+    DemoMusicCallbacksBase::Init();
 
-	m_iPlayingID = AK::SoundEngine::PostEvent( 
-		AK::EVENTS::PLAYMUSICDEMO2,
-		GAME_OBJECT_MUSIC,
-		AK_MusicPlaylistSelect | AK_EndOfEvent,
-		&DemoMusicPlaylistCallbacks::MusicCallback,
-		this
-		);
+    m_iPlayingID = AK::SoundEngine::PostEvent(
+        AK::EVENTS::PLAYMUSICDEMO2,
+        GAME_OBJECT_MUSIC,
+        AK_MusicPlaylistSelect | AK_EndOfEvent,
+        &DemoMusicPlaylistCallbacks::MusicCallback,
+        this
+    );
 
 
-	return true;
+    return true;
 }
 
-void DemoMusicPlaylistCallbacks::MusicCallback( AkCallbackType in_eType, AkCallbackInfo* in_pCallbackInfo )
+void DemoMusicPlaylistCallbacks::MusicCallback(AkCallbackType in_eType, AkCallbackInfo* in_pCallbackInfo)
 {
-	DemoMusicPlaylistCallbacks* pPage = (DemoMusicPlaylistCallbacks*)in_pCallbackInfo->pCookie;
-	
-	if ( in_eType == AK_MusicPlaylistSelect )
-	{
-		AkMusicPlaylistCallbackInfo* pPlaylistInfo = static_cast<AkMusicPlaylistCallbackInfo*>( in_pCallbackInfo );
-		pPlaylistInfo->uPlaylistItemDone = pPage->m_bStopPlaylist;
-		pPlaylistInfo->uPlaylistSelection = pPage->m_uiPlaylistItem++;
-		if ( pPage->m_uiPlaylistItem == pPlaylistInfo->uNumPlaylistItems )
-			pPage->m_uiPlaylistItem = 0;
-	}
-	else if ( in_eType == AK_EndOfEvent )
-	{
-		pPage->m_bIsPlaying = false;
-		pPage->m_uiPlaylistItem = 0;
-	}
+    DemoMusicPlaylistCallbacks* pPage = (DemoMusicPlaylistCallbacks*)in_pCallbackInfo->pCookie;
+
+    if (in_eType == AK_MusicPlaylistSelect)
+    {
+        AkMusicPlaylistCallbackInfo* pPlaylistInfo = static_cast<AkMusicPlaylistCallbackInfo*>(in_pCallbackInfo);
+        pPlaylistInfo->uPlaylistItemDone = pPage->m_bStopPlaylist;
+        pPlaylistInfo->uPlaylistSelection = pPage->m_uiPlaylistItem++;
+        if (pPage->m_uiPlaylistItem == pPlaylistInfo->uNumPlaylistItems)
+            pPage->m_uiPlaylistItem = 0;
+    }
+    else if (in_eType == AK_EndOfEvent)
+    {
+        pPage->m_bIsPlaying = false;
+        pPage->m_uiPlaylistItem = 0;
+    }
 }
 
 // *********************************************************************************
 // MIDI Callbacks
 // *********************************************************************************
-DemoMIDICallbacks::DemoMIDICallbacks( Menu& in_ParentMenu )
-: DemoMusicCallbacksBase( in_ParentMenu, "MIDI Callback Demo" )
-, m_byNote( 0 )
-, m_byVelocity( 0 )
-, m_byCc( 0 )
-, m_byValue( 0 )
+DemoMIDICallbacks::DemoMIDICallbacks(Menu& in_ParentMenu)
+    : DemoMusicCallbacksBase(in_ParentMenu, "MIDI Callback Demo")
+      , m_byNote(0)
+      , m_byVelocity(0)
+      , m_byCc(0)
+      , m_byValue(0)
 {
-	m_szHelp  = "Shows MIDI messages the game can receive using callbacks. MIDI messages"
-				" include the MIDI notes, CC values, Pitch Bend, After Touch and Program Changes.";
+    m_szHelp = "Shows MIDI messages the game can receive using callbacks. MIDI messages"
+        " include the MIDI notes, CC values, Pitch Bend, After Touch and Program Changes.";
 }
 
 
 void DemoMIDICallbacks::Draw()
 {
-	DemoMusicCallbacksBase::Draw();
+    DemoMusicCallbacksBase::Draw();
 
-	if ( m_bIsPlaying )
-	{
-		char strBuf[50];
-		int iPosX = m_pParentMenu->GetWidth() / 4;
-		int iPosY = m_pParentMenu->GetHeight() / 3;
+    if (m_bIsPlaying)
+    {
+        char strBuf[50];
+        int iPosX = m_pParentMenu->GetWidth() / 4;
+        int iPosY = m_pParentMenu->GetHeight() / 3;
 
-		char strNote[10] = {0};
-		MidiNoteToString( m_byNote, strNote, sizeof(strNote)/sizeof(char) );
+        char strNote[10] = {0};
+        MidiNoteToString(m_byNote, strNote, sizeof(strNote) / sizeof(char));
 
-		snprintf( strBuf, 50, "Last Note ON:%s\nVelocity:%d", strNote, m_byVelocity );
+        snprintf(strBuf, 50, "Last Note ON:%s\nVelocity:%d", strNote, m_byVelocity);
 
-		// Draw the play position and subtitles
-		DrawTextOnScreen( strBuf, iPosX, iPosY, DrawStyle_Text );
+        // Draw the play position and subtitles
+        DrawTextOnScreen(strBuf, iPosX, iPosY, DrawStyle_Text);
 
-		iPosY = (int)(m_pParentMenu->GetHeight() *0.666);
-		snprintf( strBuf, 50, "Last CC%d:%d", m_byCc, m_byValue );
+        iPosY = (int)(m_pParentMenu->GetHeight() * 0.666);
+        snprintf(strBuf, 50, "Last CC%d:%d", m_byCc, m_byValue);
 
-		// Draw the play position and subtitles
-		DrawTextOnScreen( strBuf, iPosX, iPosY, DrawStyle_Text );
-	}
+        // Draw the play position and subtitles
+        DrawTextOnScreen(strBuf, iPosX, iPosY, DrawStyle_Text);
+    }
 }
 
 bool DemoMIDICallbacks::Init()
 {
-	DemoMusicCallbacksBase::Init();
+    DemoMusicCallbacksBase::Init();
 
-	m_iPlayingID = AK::SoundEngine::PostEvent( 
-		AK::EVENTS::PLAYMUSICDEMO3,
-		GAME_OBJECT_MUSIC,
-		AK_MIDIEvent | AK_EndOfEvent,
-		&DemoMIDICallbacks::MusicCallback,
-		this
-		);
+    m_iPlayingID = AK::SoundEngine::PostEvent(
+        AK::EVENTS::PLAYMUSICDEMO3,
+        GAME_OBJECT_MUSIC,
+        AK_MIDIEvent | AK_EndOfEvent,
+        &DemoMIDICallbacks::MusicCallback,
+        this
+    );
 
 
-	return true;
+    return true;
 }
 
-void DemoMIDICallbacks::MusicCallback( AkCallbackType in_eType, AkCallbackInfo* in_pCallbackInfo )
+void DemoMIDICallbacks::MusicCallback(AkCallbackType in_eType, AkCallbackInfo* in_pCallbackInfo)
 {
-	DemoMIDICallbacks* pPage = (DemoMIDICallbacks*)in_pCallbackInfo->pCookie;
-	
-	if ( in_eType == AK_MIDIEvent )
-	{
-		AkMIDIEventCallbackInfo* pMidiInfo = static_cast<AkMIDIEventCallbackInfo*>( in_pCallbackInfo );
+    DemoMIDICallbacks* pPage = (DemoMIDICallbacks*)in_pCallbackInfo->pCookie;
 
-		if( pMidiInfo->midiEvent.byType == AK_MIDI_EVENT_TYPE_CONTROLLER )
-		{
-			pPage->m_byCc = pMidiInfo->midiEvent.Cc.byCc;
-			pPage->m_byValue = pMidiInfo->midiEvent.Cc.byValue;
-		}
-		else if( pMidiInfo->midiEvent.byType == AK_MIDI_EVENT_TYPE_NOTE_ON )
-		{
-			pPage->m_byNote = pMidiInfo->midiEvent.NoteOnOff.byNote;
-			pPage->m_byVelocity = pMidiInfo->midiEvent.NoteOnOff.byVelocity;
-		}
-	}
-	else if ( in_eType == AK_EndOfEvent )
-	{
-		pPage->m_bIsPlaying = false;
-	}
+    if (in_eType == AK_MIDIEvent)
+    {
+        AkMIDIEventCallbackInfo* pMidiInfo = static_cast<AkMIDIEventCallbackInfo*>(in_pCallbackInfo);
+
+        if (pMidiInfo->midiEvent.byType == AK_MIDI_EVENT_TYPE_CONTROLLER)
+        {
+            pPage->m_byCc = pMidiInfo->midiEvent.Cc.byCc;
+            pPage->m_byValue = pMidiInfo->midiEvent.Cc.byValue;
+        }
+        else if (pMidiInfo->midiEvent.byType == AK_MIDI_EVENT_TYPE_NOTE_ON)
+        {
+            pPage->m_byNote = pMidiInfo->midiEvent.NoteOnOff.byNote;
+            pPage->m_byVelocity = pMidiInfo->midiEvent.NoteOnOff.byVelocity;
+        }
+    }
+    else if (in_eType == AK_EndOfEvent)
+    {
+        pPage->m_bIsPlaying = false;
+    }
 }
