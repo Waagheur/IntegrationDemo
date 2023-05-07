@@ -34,8 +34,9 @@ AK::SoundEngine::CancelEventCallback(m_iPlayingID);
 `
 
 For the recording of sounds we changed the DemoMusicCallbacks class, because its usage of callbacks allows to stop capture of sound file exactly when the event ends. 
-Since some events give similar, but random sounds, they are recorded several times. Since some events are infinite, capture time is limited to 10 seconds, such events are
-recorded only 1 time.
+Since some events give similar, but random sounds, they are recorded several times. Since some events are infinite, capture time is limited to 10 seconds, such events are recorded only 1 time.
+
+Bad news is that I didn't manage to get functions like ClearAllEvents and ClearAllSoundbanks working, so to have only 1 soundbank loaded at a time (to avoid capturing same events into several files with different bank prefixes) I restart this program for every soundbank, it automatically skips them if there are existing recorded .wav files.
 
 ## Setup
 
