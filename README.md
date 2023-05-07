@@ -36,3 +36,7 @@ AK::SoundEngine::CancelEventCallback(m_iPlayingID);
 For the recording of sounds we changed the DemoMusicCallbacks class, because its usage of callbacks allows to stop capture of sound file exactly when the event ends. 
 Since some events give similar, but random sounds, they are recorded several times. Since some events are infinite, capture time is limited to 10 seconds, such events are
 recorded only 1 time.
+
+## Setup
+
+To compile this, will need WWise 2016.1 SDK, DirectX 9 SDK
